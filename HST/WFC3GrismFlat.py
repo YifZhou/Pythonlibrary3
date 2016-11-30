@@ -5,7 +5,7 @@
 
 from astropy.io import fits
 import numpy as np
-
+from os import path
 
 def xtowl(x):
     """
@@ -18,9 +18,11 @@ def getFlatCube(arraySize):
     """read flat cube from fits file
     """
     flatCube = np.zeros([arraySize, arraySize, 4])
-    startPixel = (1014 - arraySize) / 2
+    startPixel = (1014 - arraySize) // 2
+    scriptDIR = path.dirname(path.realpath(__file__))
     for i in range(4):
-        flatCube[:, :, i] = fits.getdata('WFC3.IR.G141.flat.2.fits', i)[startPixel:-startPixel, startPixel:-startPixel]
+        flatCube[:, :, i] = fits.getdata(
+            path.join(scriptDIR, 'WFC3.IR.G141.flat.2.fits'), i)[startPixel:-startPixel, startPixel:-startPixel]
     return flatCube
 
 
