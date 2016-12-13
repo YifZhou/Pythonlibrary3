@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 
-from astropy.io import fits
 import numpy as np
 
 """flag the bad pixel and create mask for the bad pixels
@@ -25,7 +24,7 @@ flag_dict = {
 }
 
 
-def dqMask(fnList, imageDim=256, flagList=[4, 16, 32, 256]):
+def dqMask(dq, flagList=[4, 16, 32, 256]):
     """identify certain flagged pixels as bad pixels
     mark the bad pixels as nan
 
@@ -34,14 +33,13 @@ def dqMask(fnList, imageDim=256, flagList=[4, 16, 32, 256]):
       imageDim -- (default 256 subframe) dq image size
       flagList -- flag used to identify bad pixels
     """
-    dqMask = np.zeros((imageDim, imageDim))
-    for i, fn in enumerate(fnList):
-        dq = fits.getdata(fn, 'dq')
-        for flag in flagList:
-            dqMask += dq // flag % 2
+    dqMask = np.zeros_like(dq, dtype=float)
+    for flag in flagList:
+        dqMask += dq // flag % 2
     dqMask[dqMask != 0] = np.nan
     dqMask[~np.isnan(dqMask)] = 1
     return dqMask
+
 
 if __name__ == '__main__':
     pass
