@@ -11,6 +11,7 @@ import numpy as np
 
 def twoScalePlot(x,
                  y,
+                 yerr=None,
                  scaleFactor=1,
                  xlabel='',
                  y1label='',
@@ -20,7 +21,10 @@ def twoScalePlot(x,
     if ax is None:
         fig, ax = plt.subplots()
     ax2 = ax.twinx()
-    ax.plot(x, y / scaleFactor, **plotkw)
+    if yerr is None:
+        ax.plot(x, y / scaleFactor, **plotkw)
+    else:
+        ax.errorbar(x, y / scaleFactor, yerr=yerr / scaleFactor, **plotkw)
     ax2.set_ylim(np.array(ax.get_ylim()) * scaleFactor)
     # ax2.set_yticks(ax.get_yticks())
     # ax2.set_yticklabels(
