@@ -1,0 +1,122 @@
+\RequirePackage[l2tabu, orthodox]{nag}
+\documentclass[paper=letter, fontsize=11pt]{scrartcl} % A4 paper and 11pt font size
+
+\usepackage{fouriernc} % Use the Adobe Utopia font for the document - comment this line to return to the LaTeX default
+\usepackage[english]{babel} % English language/hyphenation
+\usepackage{amsmath,amsfonts,amsthm} % Math packages
+\usepackage{xspace}
+\usepackage{graphicx}
+\usepackage{sectsty} % Allows customizing section commands
+\allsectionsfont{\centering \normalfont\scshape} % Make all sections centered, the default font and small caps
+\usepackage{booktabs}
+\usepackage[use-xspace]{siunitx}
+\usepackage{fancyhdr} % Custom headers and footers
+\pagestyle{fancyplain} % Makes all pages in the document conform to the custom headers and footers
+\fancyhead{} % No page header - if you want one, create it in the same way as the footers below
+\fancyfoot[L]{} % Empty left footer
+\fancyfoot[C]{} % Empty center footer
+\fancyfoot[R]{\thepage} % Page numbering for right footer
+\renewcommand{\headrulewidth}{0pt} % Remove header underlines
+\renewcommand{\footrulewidth}{0pt} % Remove footer underlines
+\setlength{\headheight}{13.6pt} % Customize the height of the header
+
+
+\setlength\parindent{0pt} % Removes all indentation from paragraphs - comment this line for an assignment with lots of text
+
+% ----------------------------------------------------------------------------------------
+%	TITLE SECTION
+% ----------------------------------------------------------------------------------------
+
+\newcommand{\horrule}[1]{\rule{\linewidth}{#1}} % Create horizontal rule command with 1 argument of height
+
+\title{	
+  \normalfont \normalsize 
+  % \textsc{university, school or department name} \\ [25pt] % Your university, school and/or department name(s)
+  \horrule{0.5pt} \\[0.4cm] % Thin top horizontal rule
+  \huge  WFC3 Detector Timing for Scan Mode Observations\\ % The assignment title
+  \horrule{2pt} \\[0.5cm] % Thick bottom horizontal rule
+}
+
+\author{Yifan Zhou} % Your name
+
+\date{\normalsize\today} % Today's date or a custom date
+
+\begin{document}
+\maketitle
+\section{Basic Data}
+Key data for calculating the read/resetting rate for WFC3 detector.
+\begin{table}[!h]
+  \centering
+  \caption{WFC3 detector read/reset rate}
+  \begin{tabular}{llll}
+    \toprule
+    subarray&readout time &readout time &readout speed \\
+    ~&(theoretical)& (measured)&per row (\SI{}{s^-1})\\
+    \midrule
+    64x64&0.011&0.04&\SI{800}{} \\
+    128x128&0.045&0.092&\SI{696}{}\\
+    256x256&0.1825&0.257&\SI{498}{}\\
+    512x512&0.730&0.832&\SI{308}{}\\
+    \bottomrule
+  \end{tabular}
+  \label{tab:data}
+\end{table}
+\section{Derivation}
+\newcommand{\vs}{\ensuremath{v_\mathrm{s}\xspace}}
+\newcommand{\vr}{\ensuremath{v_\mathrm{r}\xspace}}
+\begin{table}[h]
+  \centering
+  \caption{Parameter definitions}
+  \begin{tabular}{ll}
+    \toprule
+    Names&Definition\\
+    \midrule
+    exptime& exposure time, the time between the start of the reset and the start of the last read\\
+    $S_{0}$ & planned scan length, scan length from the start of the zeroth read and the start of the last read\\
+    $L$ & array size\\
+    $y_{10}$& pointing position when the reset starts \\
+    $y_{1}$& pointing position when the reset past the telescope pointing position, real start of scan\\
+    $y_{20}$& poiting position when last read starts\\
+    $y_2$ & read end of the scan\\
+    \vs & scan speed (row/s)\\
+    \vr & read/reset speed\\
+          \bottomrule
+  \end{tabular}
+  \label{tab:def}
+\end{table}
+\subsection{Example: down stream scan, no mid line passing}
+\begin{align}
+  \label{eq:1}
+  & y_{10} = \frac{\vr-\vs}{\vr}y_1\\
+  & y_{20} = \frac{\vr-\vs}{\vr}y_2\\
+  &L_0 = y_{20} - y_{10}
+\end{align}
+Therefore
+\begin{align}
+  \label{eq:2}
+  & S = y_2 - y_1 = \frac{\vr}{\vr-\vs}S_0
+\end{align}
+\section{List of scan length}
+\begin{itemize}
+\item Down stream scan, no mid line passing
+  \begin{align*}
+    & S = \frac{\vr}{\vr-\vs}S_0
+  \end{align*}
+\item Up stream scan, no mid line passing
+  \begin{equation*}
+    S = \frac{\vr}{\vr+\vs}S_0
+  \end{equation*}
+\item Mid Line passing
+  \begin{equation*}
+    S = \frac{\vr}{\vs+\vr}S_0 + \frac{\vs}{\vs+\vr}L - 2\frac{\vs}{\vs+\vr}(L-y_1)
+  \end{equation*}
+  or
+    \begin{equation*}
+    S = \frac{\vr}{\vs+\vr}S_0 + \frac{\vs}{\vs+\vr}L - 2\frac{\vs}{\vs+\vr}y_1
+  \end{equation*}
+\end{itemize}
+\end{document}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:
