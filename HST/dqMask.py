@@ -33,7 +33,7 @@ def dqMask(dq, flagList=[4, 16, 32, 256]):
       imageDim -- (default 256 subframe) dq image size
       flagList -- flag used to identify bad pixels
     """
-    dqMask = np.zeros_like(dq)
+    dqMask = np.zeros_like(dq, dtype=float)
     for flag in flagList:
         dqMask += dq // flag % 2
     dqMask[dqMask != 0] = np.nan

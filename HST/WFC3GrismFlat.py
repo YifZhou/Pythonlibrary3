@@ -26,21 +26,44 @@ def getFlatCube(arraySize):
     return flatCube
 
 
-def calFlat(x0, arraySize=256):
-    """calcualte the wavelength dependent flat field
+def calFlat(x0, outSize=256):
     """
-    flatCube = getFlatCube(arraySize)
+    x0 the x corrdinate of the source, in detector coordinate
+    """
+    # read in the flat cube
+    flatCube = np.zeros((1014, 1014, 4))
+    scriptDIR = path.dirname(path.realpath(__file__))
+    for i in range(4):
+        flatCube[:, :, i] = fits.getdata(path.join(scriptDIR, 'WFC3.IR.G141.flat.2.fits'), i)
     lambda_min = 10600
     lambda_max = 17000
-    lambdaList = xtowl(np.arange(arraySize) - x0)
-    # import ipdb;
-    # ipdb.set_trace()
+    lambdaList = xtowl(np.arange(1014) - x0)
     flat = flatCube[:, :, 0].copy()
     l = (lambdaList - lambda_min) / (lambda_max - lambda_min)
-    for i in range(arraySize):
+    for i in range(1014):
         flat[i, :] = flat[i, :] + flatCube[i, :, 1] * l +\
                      flatCube[i, :, 2]*l**2 + flatCube[i, :, 3]*l**3
-    return flat
+    margin = (1014 - outSize) // 2
+    if margin == 0:
+        return flat
+    else:
+        return flat[margin:-margin, margin:-margin]
+
+# def calFlat(x0, arraySize=256):
+#     """calcualte the wavelength dependent flat field
+#     """
+#     flatCube = getFlatCube(arraySize)
+#     lambda_min = 10600
+#     lambda_max = 17000
+#     lambdaList = xtowl(np.arange(arraySize) - x0)
+#     # import ipdb;
+#     # ipdb.set_trace()
+#     flat = flatCube[:, :, 0].copy()
+#     l = (lambdaList - lambda_min) / (lambda_max - lambda_min)
+#     for i in range(arraySize):
+#         flat[i, :] = flat[i, :] + flatCube[i, :, 1] * l +\
+#                      flatCube[i, :, 2]*l**2 + flatCube[i, :, 3]*l**3
+#     return flat
 
 # x0List = [19.915, 23.95, 20.06, 20.16, 20.06, 21.91, 21.94, 23.26, 23.94,
 #           21.73, 21.73, 21.73, 21.16, 24.11,
