@@ -7,6 +7,7 @@ from astropy.io import fits
 import numpy as np
 from os import path
 
+
 def xtowl(x):
     """
     convert the pixel index to wavelength

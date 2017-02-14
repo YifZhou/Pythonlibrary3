@@ -7,6 +7,7 @@ usually for make image template
 from astropy.io import fits
 import numpy as np
 
+
 def medianImage(fnList, imageDim=256, dq=None):
     """make the median combined images
 
