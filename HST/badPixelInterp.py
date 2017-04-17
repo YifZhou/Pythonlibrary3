@@ -8,11 +8,11 @@ from scipy.interpolate import griddata
 
 def badPixelInterp(im, mask):
     """im -- image to be interpolated
-       mask -- mask out the bad pixels, bad pixel should be masked with np.nan
+       mask -- bad pixel mask, a boolean array, mark bad pixel as True
     """
     return_im = im.copy()
-    nan_i, nan_j = np.where(np.isnan(mask))  # identify bad pixels
-    for i, j in zip(nan_i, nan_j):
+    bad_i, bad_j = np.where(mask)  # identify bad pixels
+    for i, j in zip(bad_i, bad_j):
         # loop over different pixels
         i_low = max(i - 4, 0)
         i_high = i + 4

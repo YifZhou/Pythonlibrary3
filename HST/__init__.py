@@ -13,3 +13,4 @@ from .WFC3GrismFlat import calFlat
 from .badPixelInterp import badPixelInterp
 from .inpaint_array import inpaint_array
 from .spiderMask import spiderMask
+from .circleMask import circleMask

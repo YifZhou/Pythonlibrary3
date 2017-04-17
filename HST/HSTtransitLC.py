@@ -10,7 +10,9 @@ return the electron count for each exposure
 
 import matplotlib.pyplot as plt
 import batman
+import numpy as np
 from HST.obsTime import obsTime
+
 def HSTtransitLC(expTime, cRate,
                  param,
                  orbits=4,
@@ -22,7 +24,7 @@ def HSTtransitLC(expTime, cRate,
     params.t0 = param['t0'] / (24 * 60)  # time of inferior conjunction
     params.per = param['period']  # orbital period
     params.rp = param['rp']  # planet radius (in units of stellar radii)
-    params.a = 15.23  # semi-major axis (in units of stellar radii)
+    params.a = param['a']  # semi-major axis (in units of stellar radii)
     params.ecc = 0  # eccentricity
     params.inc = 89.1  # inclination
     params.w = 90.  # longitude of periastron (in degrees)
@@ -33,13 +35,15 @@ def HSTtransitLC(expTime, cRate,
     m = batman.TransitModel(params, t / (24 * 3600))
     # calculate count, be careful that period in h
     count = cRate * expTime * m.light_curve(params)
-
+    t_mod = np.linspace(t.min(), t.max(), 10*len(t))
+    m = batman.TransitModel(params, t_mod / (24*3600))
+    lc_mod = m.light_curve(params)
     if plot:
         fig, ax = plt.subplots()
         ax.plot(t / 60, count, 'o')
         ax.set_xlabel('Time [min]')
         ax.set_ylabel('count [$\mathsf{e^-}$]')
-    return count, t
+    return count, t, lc_mod, t_mod
 
 
 if __name__ == '__main__':

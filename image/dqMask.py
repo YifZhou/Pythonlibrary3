@@ -26,8 +26,7 @@ flag_dict = {
 
 def dqMask(dq, flagList=[4, 16, 32, 256]):
     """identify certain flagged pixels as bad pixels
-    mark the bad pixels as nan
-
+       Use boolean array for mask, mared pixel are marked as True
     Parameters:
       fnList -- file List to get the dq image
       imageDim -- (default 256 subframe) dq image size
@@ -36,9 +35,9 @@ def dqMask(dq, flagList=[4, 16, 32, 256]):
     dqMask = np.zeros_like(dq, dtype=float)
     for flag in flagList:
         dqMask += dq // flag % 2
-    dqMask[dqMask != 0] = np.nan
-    dqMask[~np.isnan(dqMask)] = 1
-    return dqMask
+    # dqMask[dqMask != 0] = np.nan
+    # dqMask[~np.isnan(dqMask)] = 1
+    return dqMask.astype(bool)
 
 
 if __name__ == '__main__':

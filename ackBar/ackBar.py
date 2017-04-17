@@ -1,27 +1,3 @@
-# ! /usr/bin/env python
-
-import numpy as np
-import matplotlib.pyplot as plt
-import itertools
-"""ramp effect model
-2 means two types of traps
-
-original author: Daniel Apai
-
-Version 0.3 objected oriented code
-
-Version 0.2.1 introduce two types of traps, slow traps and fast traps
-
-Version 0.2: add extra keyword parameter to indicate scan or staring
-mode observations for staring mode, the detector receive flux in the
-same rate during overhead time as that during exposure
-precise mathematics forms are included
-
-Version 0.1: Adapted original IDL code to python by Yifan Zhou
-
-"""
-
-
 def ackBar2(
         nTrap_s,
         eta_trap_s,
@@ -34,8 +10,8 @@ def ackBar2(
         exptime=180,
         trap_pop_s=0,
         trap_pop_f=0,
-        dTrap_s=[0],
         dTrap_f=[0],
+        dTrap_s=[0],
         lost=0,
         mode='scanning'
 ):
@@ -117,34 +93,3 @@ def ackBar2(
         trap_pop_f = max(trap_pop_f, 0)
 
     return obsCounts
-
-
-if __name__ == '__main__':
-    t1 = np.linspace(0, 2700, 80)
-    t2 = np.linspace(5558, 8280, 80)
-    t = np.concatenate((t1, t2))
-    crate = 100
-    crates = crate * np.ones(len(t))
-    dataDIR = '/Users/ZhouYf/Documents/HST14241/alldata/2M0335/DATA/'
-    from os import path
-    import pandas as pd
-
-    info = pd.read_csv(
-        path.expanduser('~/Documents/HST14241/alldata/2M0335/2M0335_fileInfo.csv'),
-        parse_dates=True,
-        index_col='Datetime')
-    info['Time'] = np.float32(info.index - info.index.values[0]) / 1e9
-    expTime = info['Exp Time'].values[0]
-    grismInfo = info[info['Filter'] == 'G141']
-    tExp = grismInfo['Time'].values
-    # cRates = np.ones(len(LC)) * LC.mean() * 1.002
-    cRates = np.ones(len(tExp)) * 100
-    obs = ackBar2(500, 0.01, 5000,
-                  500, 0.005, 20,
-                  tExp, cRates, exptime=expTime, lost=0,
-                  mode='scanning')
-    plt.close('all')
-    # plt.plot(tExp, LC*expTime, 'o')
-    plt.plot(tExp, obs, '-')
-    # plt.ylim([crate * 0.95, crate * 1.02])
-    plt.show()

@@ -7,27 +7,27 @@ from matplotlib.patches import Ellipse
 
 
 class sourceExtraction:
-    def __init__(self, im, sigma=2.0, subback=False):
+    def __init__(self, im, sigma=2.0, mask=None, subback=False):
         self.im = im
         bkg = sep.Background(im)
         if subback:
             self.im = self.im - bkg.back()
-        self.obj = sep.extract(self.im, sigma, err=bkg.globalrms)
-        self.mask = None
+        self.obj = sep.extract(self.im, sigma, mask=mask, err=bkg.globalrms)
+        self.objmask = None
 
     def mask_source(self, scale=1):
-        if self.mask is not None:
-            return self.mask
+        if self.objmask is not None:
+            self.objmask
         yy, xx = np.mgrid[0:self.im.shape[0], 0:self.im.shape[1]]
         flux_scale = np.log(self.obj['flux']) / 2
         # cxx, cyy, cxy = sep.ellipse_coeffs(self.obj['a'], self.obj['b'], self.obj['theta'])
-        self.mask = np.zeros_like(self.im, dtype=bool)
+        self.objmask = np.zeros_like(self.im, dtype=bool)
         for i in range(len(self.obj)):
-            self.mask[np.where(self.obj['cxx'][i] * (xx - self.obj['x'][i])**2 +
+            self.objmask[np.where(self.obj['cxx'][i] * (xx - self.obj['x'][i])**2 +
                                self.obj['cyy'][i] * (yy - self.obj['y'][i])**2 +
                                self.obj['cxy'][i] * (xx - self.obj['x'][i]) * (yy - self.obj['y'][i])
                                < (scale*flux_scale[i])**2)] = True
-        return self.mask
+        return self.objmask
 
     def mark_source(self, scale=1, vmin=None, vmax=None):
         fig, ax = plt.subplots()

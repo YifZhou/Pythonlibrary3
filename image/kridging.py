@@ -91,6 +91,17 @@ class Kriging2d(object):
         self.gp.L_ = cholesky(K, lower=True)  # Line 2
         self.gp.alpha_ = cho_solve((self.gp.L_, True), self.gp.y_train_)  # Line 3
 
+    def kriging_fix(self, X, y, theta):
+        """fix the kriging parameter"""
+        self.gp.n_restarts_optimizer = 0  # avoid restart
+        self.gp.fit(X, y)
+        self.gp.kernel_.theta = np.log(theta)
+        K = self.gp.kernel_(self.gp.X_train_)
+        K[np.diag_indices_from(K)] += self.gp.alpha
+        self.gp.L_ = cholesky(K, lower=True)
+        self.gp.alpha_ = cho_solve((self.gp.L_, True), self.gp.y_train_)
+        self.gp.n_restarts_optimizer = 20  # set the restart optimizer back to 20
+
     def interpolate(self, Xpred, shape=None):
         if shape is None:
             shape = (Xpred.shape[0], )
