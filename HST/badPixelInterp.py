@@ -19,7 +19,7 @@ def badPixelInterp(im, mask):
         j_low = max(j - 4, 0)
         j_high = j + 4
         # return_im[i, j] = np.nanmean(im[i_low:i_high, j_low:j_high])
-        i_list, j_list = np.where(~np.isnan(mask[i_low:i_high, j_low:j_high]))
+        i_list, j_list = np.where(mask[i_low:i_high, j_low:j_high] == 0)
         try:
             return_im[i, j] = griddata(list(zip(i_list, j_list)),
                                        im[i_low+i_list, j_low+j_list],

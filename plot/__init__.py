@@ -5,3 +5,4 @@ from .plotResidual import plotResidual
 from .twoScalePlot import twoScalePlot
 from .plotMCMC import plotMCMC
 from .plotRampFit import plotRampFit
+from .plotGHist import plotGHist
