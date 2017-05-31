@@ -5,6 +5,7 @@
 
 import numpy as np
 
+
 def rebin(a, binSize=1, method='mean'):
     """bin the input array a to the input binSize
     Keyword Arguments:

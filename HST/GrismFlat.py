@@ -7,14 +7,25 @@ from astropy.io import fits
 import numpy as np
 
 
-def xtowl(x):
+def wlDispersion(xc, yc):
     """
     convert the pixel index to wavelength
     """
-    return (x * 46.7 + 8953.)
+    DLDP0 = [8949.40742544, 0.08044032819916265]
+    DLDP1 = [44.97227893276267,
+             0.0004927891511929662,
+             0.0035782416625653765,
+             -9.175233345083485e-7,
+             2.2355060371418054e-7,  -9.258690000316504e-7]
+    # calculate field dependent dispersion coefficient
+    p0 = DLDP0[0] + DLDP0[1] * xc
+    p1 = DLDP1[0] + DLDP1[1] * xc + DLDP1[2] * yc + \
+         DLDP1[3] * xc**2 + DLDP1[4] * xc * yc + DLDP1[5] * yc**2
+    dx = np.arange(1014) - xc
+    return (p0 + dx * p1)
 
 
-def calFlat(x0, outSize=256):
+def calFlat(xc, yc, outSize=256):
     """
     x0 the x corrdinate of the source, in detector coordinate
     """
@@ -24,7 +35,7 @@ def calFlat(x0, outSize=256):
         flatCube[:, :, i] = fits.getdata('WFC3.IR.G141.flat.2.fits', i)
     lambda_min = 10600
     lambda_max = 17000
-    lambdaList = xtowl(np.arange(1014) - x0)
+    lambdaList = wlDispersion(xc, yc)
     flat = flatCube[:, :, 0].copy()
     l = (lambdaList - lambda_min) / (lambda_max - lambda_min)
     for i in range(1014):

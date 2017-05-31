@@ -3,7 +3,7 @@ from __future__ import print_function
 import subprocess as sp
 import os
 
-#import sys
+#  import sys
 """
 Use Tinytim to generate a PSFs
 """

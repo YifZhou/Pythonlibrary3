@@ -16,3 +16,5 @@ from .spiderMask import spiderMask
 from .circleMask import circleMask
 from .pyTinyTim import pyTinyTim
 from .readPSF import readPSF
+from .WFC3_EPSF import WFC3_EPSF
+from .G141SkyCube import G141SkyCube
