@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 def linearFit(x, y, dy=None, doPlot=False, ax=None):
     if dy is None:
-        dy = np.ones(len(y))
+        dy = np.ones_like(y)
     """
     my own linear fit routine, since there is no good scipy or numpy linearFit routine written up
     """

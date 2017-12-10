@@ -10,6 +10,7 @@ from .dqMask import dqMask
 from .scanningData import scanFile, scanData
 from .scanMask import makeMask
 from .WFC3GrismFlat import calFlat
+from .WFC3GrismFlat import wlDispersion
 from .badPixelInterp import badPixelInterp
 from .inpaint_array import inpaint_array
 from .spiderMask import spiderMask
