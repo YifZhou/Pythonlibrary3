@@ -48,6 +48,12 @@ def initiateProject(configFN):
     dataInfo = timeSeriesInfo(fileType, path.join(projDIR, 'data'))
     dataInfoName = projName + '_fileInfo.csv'
     dataInfo.to_csv(path.join(projDIR, 'info', dataInfoName), index=False)
+    # write configuration file to project directory
+    configFNBasename = path.basename(configFN)
+    with open(path.join(projDIR, 'info', configFNBasename), 'w') as configWFN:
+        conf.write(configWFN)
+    print('Project {0} initiated'.format(projName))
+    print('Project established at {0}'.format(projDIR))
 
 
 if __name__ == '__main__':
