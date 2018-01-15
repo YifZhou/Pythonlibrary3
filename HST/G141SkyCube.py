@@ -15,8 +15,8 @@ scriptDIR = path.dirname(path.realpath(__file__))
 
 def G141SkyCube(subframe=256):
     """calculate the field dependent sky cube
-    xc, yc: the position of the source in direct image
-    subframe: size of the subframe for output
+
+    :param subframe: size of the subframe for output
     """
     with open(path.join(scriptDIR, 'G141_skycube.pkl'), 'rb') as pkl:
         sky = pickle.load(pkl)

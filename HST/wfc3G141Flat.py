@@ -7,6 +7,8 @@ from astropy.io import fits
 import numpy as np
 from os import path
 
+__all__ = ['calFlat']
+
 
 def wlDispersion(xc, yc):
     """
@@ -38,9 +40,13 @@ def getFlatCube(arraySize):
     return flatCube
 
 
-def calFlat(xc, yc, outSize=256):
-    """
-    x0 the x corrdinate of the source, in detector coordinate
+def wfc3G141Flat(xc, yc, subFrame=256):
+    """constructing wavelength dependent flat fileds
+
+    :param xc: centroid in x direction
+    :param yc: centroid in y direction
+    :param subFrame:
+
     """
     # read in the flat cube
     flatCube = np.zeros((1014, 1014, 4))
@@ -55,7 +61,7 @@ def calFlat(xc, yc, outSize=256):
     for i in range(1014):
         flat[i, :] = flat[i, :] + flatCube[i, :, 1] * l +\
                      flatCube[i, :, 2]*l**2 + flatCube[i, :, 3]*l**3
-    margin = (1014 - outSize) // 2
+    margin = (1014 - subFrame) // 2
     if margin == 0:
         return flat
     else:
@@ -65,6 +71,6 @@ def calFlat(xc, yc, outSize=256):
 if __name__ == '__main__':
     xc = 500
     yc = 500
-    flat = calFlat(xc, yc)
+    flat = wfcG141Flat(xc, yc)
     from plot import imshow
     imshow(flat)

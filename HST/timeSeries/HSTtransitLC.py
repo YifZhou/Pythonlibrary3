@@ -7,11 +7,11 @@ return the electron count for each exposure
 """
 
 
-
 import matplotlib.pyplot as plt
 import batman
 import numpy as np
-from HST.obsTime import obsTime
+from .HSTtiming import HSTtiming
+
 
 def HSTtransitLC(expTime, cRate,
                  param,
@@ -20,6 +20,20 @@ def HSTtransitLC(expTime, cRate,
                  visibility=50,  # min
                  overhead=20,  # s
                  plot=False):
+    """Simulate a transit signal observed by HST
+
+    :param expTime: exposure time
+    :param cRate: average count rate
+    :param param: parameters describing the sinusoid, a batman dictionary
+    :param orbits: number of orbits
+    :param orbit: (default 96 min) length of a orbit
+    :param visibility: (default 50 min) length of visible period per orbit
+    :param overhead: overhead [s] per exposure
+    :param plot: wheter to make a plot
+    :returns: count, t
+    :rtype: tuple
+
+    """
     params = batman.TransitParams()  # object to store transit parameters
     params.t0 = param['t0'] / (24 * 60)  # time of inferior conjunction
     params.per = param['period']  # orbital period
@@ -31,7 +45,7 @@ def HSTtransitLC(expTime, cRate,
     params.limb_dark = "linear"  # limb darkening model
     params.u = [0.28]  # limb darkening coefficients
 
-    t = obsTime(expTime, orbits, orbitLength, visibility, overhead)
+    t = HSTtiming(expTime, orbits, orbitLength, visibility, overhead)
     m = batman.TransitModel(params, t / (24 * 3600))
     # calculate count, be careful that period in h
     count = cRate * expTime * m.light_curve(params)
@@ -43,6 +57,7 @@ def HSTtransitLC(expTime, cRate,
         ax.plot(t / 60, count, 'o')
         ax.set_xlabel('Time [min]')
         ax.set_ylabel('count [$\mathsf{e^-}$]')
+        plt.show()
     return count, t, lc_mod, t_mod
 
 

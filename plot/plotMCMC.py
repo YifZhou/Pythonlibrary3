@@ -5,42 +5,40 @@
 import matplotlib.pyplot as plt
 import corner
 import numpy as np
-from os import path
 """plot mcmc fit result
 """
 
 
-def plotMCMC(chain, modelFunc, modelArgs, modelX, obsY,
-             argName=None, burnin=100, saveDIR=None):
-    """plot MCMC result
-    Keyword Arguments:
-    chain     -- mcmc result
-    modelFunc -- model function
-    modelArgs -- model function arguments
-    modelX    -- x axis argument for the plot
-    obsY      -- observed value
-    argName   -- (default None)
-    burnin    -- (default 100) burn in steps
-    saveDIR   -- (default None)  save directory, if None, don't save
+def plotMCMC(x, y, yerr, chain, params, func, *funcArgs,
+             argName=None, nSample=50):
+    """plot the mcmc fit result and compare it to the original result
+
+    :param x: x axis variable
+    :param y: y measurement
+    :param yerr: y uncertainty
+    :param chain: posterior chain, burnin removed
+    :param params: best fit parameters
+    :param func: the function to fit
+    :param funcArgs: other parameters required by fit function
+    :param nSample: number of sample in posterior chain
+    :returns: figure
+    :rtype: matplotlib.figure
+
     """
-    chainShape = chain.shape
-    nDim = chainShape[2]
-    chain = chain[:, burnin:, :].reshape((-1, nDim))  # remove the buring in part
-    # figure 1 figure plot
+    nDim = chain.shape[1]
     if argName is None:
         # default arg label is empty
         argName = [''] * nDim
-    fig1 = corner.corner(chain, labels=argName)
+    fig1 = corner.corner(chain, labels=argName, smooth=1)
 
-    # figure 2
-    fig2 = plt.figure()
-    ax = fig2.add_subplot(111)
-    nRandModel = 50  # plot 50 random model
-    for i in np.random.randint(chain.shape[0], size=nRandModel):
-        ax.plot(modelX, modelFunc(chain[i, :], *modelArgs),
-                color='k', alpha=0.1)
-    ax.plot(modelX, obsY, marker='s', lw=0)
-    if saveDIR is not None:
-        fig1.savefig(path.join(saveDIR, 'cornerPlot.png'))
-        fig2.savefig(path.join(saveDIR, 'modelPlot.png'))
+    fig2, ax = plt.subplots()
+    ax.errorbar(x, y, yerr=yerr, ls='none')
+    x0 = np.linspace(x.min(), x.max(), 10 * len(x))  # 10x sample
+    # rate of original x
+    ax.plot(x0, func(params, x0, *funcArgs), color='C3')
+    sample_index = np.random.randint(chain.shape[0], size=nSample)
+    for i in range(nSample):
+        params_i = chain[sample_index[i], :]
+        ax.plot(x0, func(params_i, x0, *funcArgs), lw=0.2,
+    color='0.6')
     return fig1, fig2

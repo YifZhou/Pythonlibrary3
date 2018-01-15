@@ -1,22 +1,31 @@
 #!/usr/bin/env python
-"""simulate a sin wave observed by HST
-default orbit length 96 min,
-default visibility per orbit, 50 min
-defaut overhead 20s
-return the electron count for each exposure
-"""
-
-
 import numpy as np
 import matplotlib.pyplot as plt
-from HST.obsTime import obsTime
+from .HSTtiming import HSTtiming
+
+
 def HSTsinLC(expTime, cRate, param,
              orbits=4,
              orbitLength=96,  # min
              visibility=50,  # min
              overhead=20,  # s
              plot=False):
-    t = obsTime(expTime, orbits, orbitLength, visibility, overhead)
+    """Simulate a sinusoidal signal observed by HST
+
+    :param expTime: exposure time
+    :param cRate: average count rate
+    :param param: parameters describing the sinusoid, a dictionary
+    :param orbits: number of orbits
+    :param orbit: (default 96 min) length of a orbit
+    :param visibility: (default 50 min) length of visible period per orbit
+    :param overhead: overhead [s] per exposure
+    :param plot: wheter to make a plot
+    :returns: count, t
+    :rtype: tuple
+
+    """
+
+    t = HSTtiming(expTime, orbits, orbitLength, visibility, overhead)
     # calculate count, be careful that period in h
     count = cRate * expTime * \
         (1 + np.sin((2 * np.pi * t / (param['period'] * 3600)) +
@@ -27,6 +36,7 @@ def HSTsinLC(expTime, cRate, param,
         ax.plot(t/60, count, 'o')
         ax.set_xlabel('Time [min]')
         ax.set_ylabel('count [$\mathsf{e^-}$]')
+        plt.show()
     return count, t
 
 

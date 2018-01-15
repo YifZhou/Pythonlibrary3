@@ -5,7 +5,7 @@ from __future__ import print_function, division
 import numpy as np
 
 
-def WFC3Dispersion(xc, yc, subarray=256):
+def wfc3Dispersion(xc, yc, subarray=256):
     """convert pixel coordinate to wavelength. Method and coefficient
     adopted from Kuntschner et al. (2009), Wilkins et al. (2014)
 
@@ -25,6 +25,9 @@ def WFC3Dispersion(xc, yc, subarray=256):
     xc = xc0 - (522 - 410)
     yc = yc0 - (522 - 532)
     """
+    coord0 = (1014 - subarray) // 2
+    xc = xc + coord0
+    yc = yc + coord0
     DLDP0 = [8949.40742544, 0.08044032819916265]
     DLDP1 = [44.97227893276267,
              0.0004927891511929662,
