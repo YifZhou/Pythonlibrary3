@@ -31,7 +31,7 @@ def initiateProject(configFN):
         else:
             exit(1)
     # first establish the directory tree
-    DIRList = ['code', 'info', 'data', 'save', 'result', 'plot']
+    DIRList = ['code', 'info', 'data', 'save', 'result', 'plot', 'calibration']
     os.makedirs(projDIR)
     for directory in DIRList:
         print('Making directory {0}'.format(path.join(projDIR, directory)))
@@ -50,6 +50,7 @@ def initiateProject(configFN):
     dataInfo.to_csv(path.join(projDIR, 'info', dataInfoName), index=False)
     # write configuration file to project directory
     configFNBasename = path.basename(configFN)
+    conf['general']['infofn'] = path.join(projDIR, 'info', dataInfoName)
     with open(path.join(projDIR, 'info', configFNBasename), 'w') as configWFN:
         conf.write(configWFN)
     print('Project {0} initiated'.format(projName))

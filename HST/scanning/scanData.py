@@ -13,7 +13,7 @@ import shelve
 from random import choice
 from plot import imshow
 
-from .scanFile import scanFile
+from HST.scanning.scanFile import scanFile
 
 """scanning data time seires
 """
@@ -46,12 +46,11 @@ class scanData(object):
         :param restore: (default False) whether restoring previous calculated result
         :param restoreDIR: (default None) restoration directory
         :returns: None
-
         """
 
         super(scanData, self).__init__()
-        self.info = pd.read_csv(
-            infoFile, parse_dates=True, index_col='Datetime')
+        self.info = pd.read_csv(infoFile, parse_dates=True,
+                                index_col='Datetime')
         self.info.sort_values('Time')
         self.info = self.info[(self.info['Filter'] == 'G141')]
         self.skyMask = fits.getdata(skyFN, 0)
