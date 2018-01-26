@@ -67,8 +67,12 @@ class scanData(object):
         self.direct_x = direct_x
         self.direct_y = direct_y
         self.ROI = ROI
+        self.XOI = np.arange(ROI[0], ROI[1])  # list of x index within ROI
         self.subarray = subarray
-        self.wavelength = wfc3Dispersion(direct_x, direct_y, subarray=subarray) / 1e4
+        # full wavelength range
+        self.wavelength = wfc3Dispersion(
+            direct_x, direct_y, subarray=subarray) / 1e4
+        self.waveOI = self.wavelength[self.XOI]  # wavelength in ROI
         self.scanFileList = []
         self.saveDIR = saveDIR
         self.time = self.info['Time'].values
@@ -88,6 +92,16 @@ class scanData(object):
             self.medianDiff1 = self.medianDiff0
         self.twoDirectScale = 1.0
 
+        # extracted light curve stores in 2D arrays
+        # First dimension is the x index/wavelength
+        # Second dimension is time
+        # Both count rate are stored
+        self.LCACQUIRED = False
+        self.countMat = np.zeros((len(xList), len(sd.time)))
+        self.countErrMat = np.zeros((len(xList), len(sd.time)))
+        self.totalCountMat = np.zeros((len(xList), len(sd.time)))
+        self.totalCountErrMat = np.zeros((len(xList), len(sd.time)))
+
         if restore:
             if restoreDIR is None:
                 restoreDIR = saveDIR
@@ -104,16 +118,32 @@ class scanData(object):
                 if self.scanDirect[i] == 0:
                     medianCube0 = self.medianCube0
                     self.scanFileList.append(
-                        scanFile(fn, fileDIR, saveDIR, self.skyMask, self.flat,
-                                 medianCube0, self.wavelength, self.xShift[i],
-                                 self.ROI, arraySize=subarray))
+                        scanFile(
+                            fn,
+                            fileDIR,
+                            saveDIR,
+                            self.skyMask,
+                            self.flat,
+                            medianCube0,
+                            self.wavelength,
+                            self.xShift[i],
+                            self.ROI,
+                            arraySize=subarray))
 
                 if self.scanDirect[i] == 1:
                     medianCube1 = self.medianCube1
                     self.scanFileList.append(
-                        scanFile(fn, fileDIR, saveDIR, self.skyMask, self.flat,
-                                 medianCube1, self.wavelength, self.xShift[i],
-                                 self.ROI, arraySize=subarray))
+                        scanFile(
+                            fn,
+                            fileDIR,
+                            saveDIR,
+                            self.skyMask,
+                            self.flat,
+                            medianCube1,
+                            self.wavelength,
+                            self.xShift[i],
+                            self.ROI,
+                            arraySize=subarray))
 
         # get image cube for calibration
         self.nSamp = self.scanFileList[0].nSamp  # number of samp read
@@ -231,6 +261,35 @@ class scanData(object):
             ax.set_ylabel('Total Counts')
             ax.text(0.05, 0.05, 'x={0})'.format(x), transform=ax.transAxes)
         return lc, lc_err
+
+    def getLightCurve(self, overwrite=False):
+        """Extract light curve from observation time series
+
+        Extracted light curves and their uncertainties are saved in 2D
+        numpy arrays. The four arrays are:
+        countMat -- light curves in terms of average count in ROI
+        countErrMat -- uncertainties for average count
+        totalCountMat -- light curves in terms of total count
+        totalCountErrMat -- uncertainties for total count
+
+        :param overwrite: (default False) If LCACQUIRED flag indicates
+        light curves are obtained, whether redo light curve extraction
+        """
+        if self.LCACQUIRED and (not overwrite):
+            print("Light curve acquired already")
+            print("To re-extract the light curve, using overwrite=True option")
+            return
+
+        for i, x in enumerate(self.XOI):
+            count, countErr = self.columnLightCurve(x,
+                                                    [self.ROI[2], self.ROI[3]])
+            totalCount, totalCountErr = sd.countLightCurve(x)
+            # use the mean of the ratio to determine the scale
+            scale = np.mean(totalCount / count)
+            self.totalCountMat[i, :] = totalCount
+            self.totalCountErrMat[i, :] = totalCountErr
+            self.countMat[j, :] = totalCount / scale
+            self.countErrMat[j, :] = totalCountErr / scale
 
     def whiteLC(self, plot=False):
         """get broadband light curve
