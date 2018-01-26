@@ -8,9 +8,10 @@ import numpy as np
 import pandas as pd
 from astropy.stats import sigma_clip
 from matplotlib import pyplot as plt
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, interp1d
 from scipy.ndimage.interpolation import shift
 
+import HST
 from HST import badPixelInterp, dqMask
 from astro import cosmics
 from plot import imshow
@@ -26,6 +27,7 @@ class scanFile:
                  skyMask,
                  flat,
                  medianCube,
+                 wavelength,
                  xshift=0,
                  ROI=[0, 256, 0, 256],
                  arraySize=256):
@@ -38,6 +40,7 @@ class scanFile:
         background calculations
         :param flat: pre-calculated flat field correcton
         :param medianCube: pre-calculated median differenced frames
+        :param wavelength: wavelength solution for the observation
         :param xshift: shift in x-direction
         :param ROI: Region of interest. ROI defines the region of interest for cosmic Ray removal
         :param arraySize: (default 256) subarray size
@@ -47,11 +50,13 @@ class scanFile:
         self.CRFOUND = False
         self.INTERPOLATED = False
         self.SKYREMOVED = False
+        self.COUNTCALCULATED = False
         self.skyMask = skyMask.copy()
         self.flat = flat
         self.fileDIR = fileDIR
         self.saveDIR = saveDIR
         self.xshift = xshift
+        self.wavelength = wavelength
         self.ROI = ROI
         self.arraySize = arraySize
         self.imaFN = path.join(fileDIR, fileName)
@@ -312,17 +317,22 @@ class scanFile:
         return np.sqrt(
             np.nanmean(error**2) / (len(error) - np.isnan(error).sum()))
 
-    def calTotalCountSpec(self, radius=20, nSampStart=0):
+    def calTotalCountSpec(self, radius=20, nSampStart=0, overwrite=False):
         """calculate column sums for every column
 
         :param radius: number of pixels at each side of the peak of
         the scanning region
         :param nSampStart: which ima frame to start
+        :param overwrite: (default False) if COUNTCALCULATED indicate this function is done, whether re-do it
         :returns: count and uncertanties
         :rtype: tuple of two float
 
         """
-
+        if self.COUNTCALCULATED and (not overwrite):
+            print("cal total count is done.")
+            print(
+                "Use option 'overwrite=True' to redo and overwrite the result")
+            return self.totalCountSpec, self.totalCountSpecErr
         nFrame = self.nSamp - 1 - nSampStart
         self.totalCountSpec = np.zeros(self.arraySize)
         totalCountSpecVar = np.zeros(self.arraySize)
@@ -342,6 +352,7 @@ class scanFile:
             self.totalCountSpec += np.nansum(im_interp, axis=0)
             totalCountSpecVar += np.nansum(err**2, axis=0) + self.skyVar[i]
         self.totalCountSpecErr = np.sqrt(totalCountSpecVar)
+        self.COUNTCALCULATED = True
         return self.totalCountSpec, self.totalCountSpecErr
 
     def white(self):
@@ -349,6 +360,33 @@ class scanFile:
         """
         return np.sum(self.totalCountSpec[self.ROI[0]:self.ROI[1]]), \
             np.sqrt(np.sum(self.totalCountSpecErr[self.ROI[0]:self.ROI[1]]**2))
+
+    def stellarSpectrum(self, wmin=1.1, wmax=1.7):
+        """get the host star spectrum
+
+        :param wmin: minimum boundary of wavelength
+        :param wmax: maximum boundary of wavelength
+        :returns: wavelength, spec, spec_err
+        :rtype: tuple of numpy array
+
+        """
+        count, err = self.calTotalCountSpec()
+        wid = np.where((self.wavelength > wmin) & (self.wavelength < wmax))[0]
+        count = count[wid]
+        err = err[wid]
+        wavelength = self.wavelength[wid]
+        # read the sensitivity file
+        sensPath = path.join(HST.__path__[0], 'CONF/WFC3.IR.G141.1st.sens.2.fits')
+        sens1st = fits.getdata(sensPath, 1)
+        sensInterp = interp1d(
+            sens1st['WAVELENGTH'] / 1e4, sens1st['SENSITIVITY'], kind='cubic')
+        sensErrorInterp = interp1d(
+            sens1st['WAVELENGTH'] / 1e4, sens1st['ERROR'], kind='cubic')
+        sensAim = sensInterp(wavelength)  # map sensitivity to aimed wavelength
+        sensErrAim = sensErrorInterp(wavelength)
+        flux = count / sensAim / self.expTime
+        fluxErr = flux * np.sqrt((err/count)**2 + (sensErrAim / sensAim)**2)
+        return wavelength, flux, fluxErr
 
     def plotSampleImage(self, nSamp):
         """plot one example image from imaDataCube

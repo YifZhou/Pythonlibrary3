@@ -24,7 +24,7 @@ def interpBadPixels(image, mask):
     fixedIm = image.copy()
     interpv = griddata(
             (goody, goodx),
-            image,
+            image[goody, goodx],
             (bady, badx),
             method='linear')
     fixedIm[bady, badx] = interpv
@@ -92,7 +92,7 @@ def padimg(fname, zero=True, correct=True, skyname=None, flatname=None):
             fullError[index0:index0+subarray, index0:index0+subarray] = f[2].data
             f[2].data = fullError
             # Extension 3
-            fullDQ = np.full((fullarray, fullarray), 4, dtyp='int')
+            fullDQ = np.full((fullarray, fullarray), 4, dtype='int')
             fullDQ[index0:index0+subarray, index0:index0+subarray] = f[3].data
             f[3].data = fullDQ
             # Extension 4

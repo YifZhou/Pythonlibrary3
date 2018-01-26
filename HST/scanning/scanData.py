@@ -2,6 +2,8 @@
 
 import os
 from os import path
+from warnings import warn
+
 import numpy as np
 import pandas as pd
 from astropy.io import fits
@@ -9,12 +11,11 @@ import matplotlib.pyplot as plt
 import pickle
 import shelve
 
-
 from random import choice
 from plot import imshow
 
 from HST.scanning.scanFile import scanFile
-
+from HST import wfc3Dispersion
 """scanning data time seires
 """
 
@@ -29,7 +30,11 @@ class scanData(object):
                  saveDIR,
                  skyFN,
                  flatFN,
+                 medianFNs,
+                 direct_x,
+                 direct_y,
                  ROI,
+                 subarray=256,
                  twoDirect=False,
                  restore=False,
                  restoreDIR=None):
@@ -40,56 +45,92 @@ class scanData(object):
         :param saveDIR: .pickle/shelve direction
         :param skyFN: pre-calculated sky Image directory
         :param flatFN: pre-calculated flat field directory
+        :param medianFNs: pickle files that saves the median of each read
+        :param direct_x: x coordinate of the direct image
+        :param direct_y: y coordinate of the direct image
         :param ROI: region of interest. Region used for process
+        :param subarray: size of the subarray
         :param twoDirect: (default False) whether bi-directional
         scanning mode applied
         :param restore: (default False) whether restoring previous calculated result
         :param restoreDIR: (default None) restoration directory
         :returns: None
-        """
 
+        """
         super(scanData, self).__init__()
-        self.info = pd.read_csv(infoFile, parse_dates=True,
-                                index_col='Datetime')
+        self.info = pd.read_csv(
+            infoFile, parse_dates=True, index_col='Datetime')
         self.info.sort_values('Time')
         self.info = self.info[(self.info['Filter'] == 'G141')]
         self.skyMask = fits.getdata(skyFN, 0)
         self.flat = fits.getdata(flatFN, 0)
+        self.direct_x = direct_x
+        self.direct_y = direct_y
         self.ROI = ROI
+        self.subarray = subarray
+        self.wavelength = wfc3Dispersion(direct_x, direct_y, subarray=subarray) / 1e4
         self.scanFileList = []
         self.saveDIR = saveDIR
         self.time = self.info['Time'].values
         self.orbit = self.info['Orbit'].values
         self.expTime = self.info['Exp Time'].values[0]
         self.xShift = self.info['DX'].values
-        # self.xShift = 0
-        self.scanDirect = self.info['ScanDirection'].values
-        with open('./diff_median_scan_0.pkl', 'rb') as pkl:
+
+        # read in median cubes
+        if type(medianFNs) != list:
+            medianFNs = [medianFNs]
+        with open(medianFNs[0], 'rb') as pkl:
             self.medianDiff0 = pickle.load(pkl)
-        with open('./diff_median_scan_1.pkl', 'rb') as pkl:
-            self.medianDiff1 = pickle.load(pkl)
+        if twoDirect:
+            with open(medianFNs[1], 'rb') as pkl:
+                self.medianDiff1 = pickle.load(pkl)
+        else:
+            self.medianDiff1 = self.medianDiff0
         self.twoDirectScale = 1.0
 
         if restore:
             if restoreDIR is None:
                 restoreDIR = saveDIR
             for fn in self.info['File Name']:
+                print("Restoring observation {0}".format(fn))
                 with open(
                         path.join(restoreDIR, fn.replace(
                             '_ima.fits', '.pickle')), 'rb') as pkf:
                     self.scanFileList.append(pickle.load(pkf))
         else:
             for i, fn in enumerate(self.info['File Name']):
+                print("Processing observation {0}".format(fn))
+                # use different median files for observation done in different scan direction
                 if self.scanDirect[i] == 0:
-                    medianDiff = self.medianDiff0
+                    medianCube0 = self.medianCube0
+                    self.scanFileList.append(
+                        scanFile(fn, fileDIR, saveDIR, self.skyMask, self.flat,
+                                 medianCube0, self.wavelength, self.xShift[i],
+                                 self.ROI, arraySize=subarray))
+
                 if self.scanDirect[i] == 1:
-                    medianDiff = self.medianDiff1
-                # fn = 'id4301ptq_ima.fits'
-                # medianDiff = self.medianDiff1
-                print(fn)
-                self.scanFileList.append(
-                    scanFile(fn, fileDIR, saveDIR, self.skyMask, self.flat,
-                             medianDiff, self.xShift[i], self.ROI))
+                    medianCube1 = self.medianCube1
+                    self.scanFileList.append(
+                        scanFile(fn, fileDIR, saveDIR, self.skyMask, self.flat,
+                                 medianCube1, self.wavelength, self.xShift[i],
+                                 self.ROI, arraySize=subarray))
+
+        # get image cube for calibration
+        self.nSamp = self.scanFileList[0].nSamp  # number of samp read
+        self.sampCubeList = []
+        self.dqCubeList = []  # mask inclucde bad pixel and cosmic rays
+        self.crCubeList = []
+        for i in range(self.nSamp):
+            sampCube = np.zeros((subarray, subarray, self.nExp))
+            dqCube = np.zeros((subarray, subarray, self.nExp))
+            crCube = np.zeros((subarray, subarray, self.nExp))
+            for j in range(self.nExp):
+                sampCube[:, :, j] = self.scanFileList[j].imaDataCube[:, :, i]
+                dqCube[:, :, j] = self.scanFileList[j].dqCube[:, :, i]
+                crCube[:, :, j] = self.scanFileList[j].crCube[:, :, i]
+            self.sampCubeList.append(sampCube.copy())
+            self.dqCubeList.append(dqCube.copy())
+            self.crCubeList.append(crCube.copy())
 
     def showExampleImage(self, n=0):
         """plot one scan image. Use the last sample in the ima Array
@@ -102,13 +143,12 @@ class scanData(object):
 
         fig = plt.figure()
         ax = fig.add_subplot(111)
-        cax = ax.matshow(
+        imshow(
             self.scanFileList[n].imaDataCube[:, :, -1] -
             np.nanmin(self.scanFileList[n].imaDataCube[:, :, -1]),
             origin='lower',
-            norm=LogNorm(),
+            ax=ax,
             cmap='viridis')
-        fig.colorbar(cax)
         return fig
 
     def pixelLightCurve(self, x, y, plot=False):
@@ -147,7 +187,7 @@ class scanData(object):
         :rtype: tuple of two numpy arrays
 
         """
-
+        warn("For more precise light curve, use countLightCurve instead")
         lc = np.zeros(len(self.scanFileList))
         lc_err = np.zeros(len(self.scanFileList))
         for i, sf in enumerate(self.scanFileList):
@@ -264,17 +304,6 @@ class scanData(object):
         ax.set_ylabel('scan rate')
         return fig
 
-    def save(self):
-        """save each scanning file to pickle
-
-        :returns: None
-
-        """
-
-        for sf in self.scanFileList:
-            sf.saveDIR = self.saveDIR
-            sf.save()
-
     def calcTwoDirectScale(self, nStart=3):
         """Use broad band light curves to calculate the factors of two
         scanning directions. Taking the average of the upp scanning
@@ -296,6 +325,17 @@ class scanData(object):
             scanCorrFactList[i] = (lc_upp[nStart:]).mean() / (
                 lc_down[nStart:]).mean()
         return scanCorrFactList.mean()
+
+    def save(self):
+        """save each scanning file to pickle
+
+        :returns: None
+
+        """
+
+        for sf in self.scanFileList:
+            sf.saveDIR = self.saveDIR
+            sf.save()
 
 
 if __name__ == '__main__':
