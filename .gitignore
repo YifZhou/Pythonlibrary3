@@ -1,1 +1,3 @@
 *.pyc
+pandeia_data-1.0/*
+pysynphot_data/*

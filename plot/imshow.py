@@ -17,7 +17,19 @@ def imshow(im,
            interpolation='nearest',
            plotColorbar=True,
            percentile=0.995):
-    """priorily using asinh to strech the image
+    """my own imshow function
+
+    :param im: the image array
+    :param vmin: minimum value
+    :param vmax: maximum value
+    :param stretch: stretching method, options: 'asinh', 'log', 'linear'
+    :param clip: (default False) flag used in normalization
+    :param ax: (default none) axes to plot to
+    :param cmap: (default 'viridis') color map to use
+    :param interpolation: (default 'nearest') interpolation method to use. Options: 'nearest', 'bilinear', 'bicubic'
+    :param plotColorbar: (default True) whether to plot color bar
+    :param percentile: (default 0.995) percentile range of values to set the vmin and vmax
+
     """
     if vmin is None:
         vmin = np.nanpercentile(im, ((1 - percentile) / 2) * 100)
