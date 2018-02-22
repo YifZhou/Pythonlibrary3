@@ -3,6 +3,8 @@
 import os
 from os import path
 from warnings import warn
+import configparser
+import json
 
 import numpy as np
 import pandas as pd
@@ -15,81 +17,77 @@ from random import choice
 from plot import imshow
 
 from HST.scanning.scanFile import scanFile
+from HST.scanning.scanDeRamp import scanDeRamp
 from HST import wfc3Dispersion
 """scanning data time seires
 """
 
 
-class scanData(object):
+class scanData:
     """the class for time sieries of scanning data
     """
 
-    def __init__(self,
-                 infoFile,
-                 fileDIR,
-                 saveDIR,
-                 skyFN,
-                 flatFN,
-                 medianFNs,
-                 direct_x,
-                 direct_y,
-                 ROI,
-                 subarray=256,
-                 twoDirect=False,
-                 restore=False,
-                 restoreDIR=None):
+    def __init__(self, configFN):
         """python class for assembling HST/WFC3 scanning data time series
 
-        :param infoFile: .csv file inlucde all the file informations
-        :param fileDIR: .fits file directory
-        :param saveDIR: .pickle/shelve direction
-        :param skyFN: pre-calculated sky Image directory
-        :param flatFN: pre-calculated flat field directory
-        :param medianFNs: pickle files that saves the median of each read
-        :param direct_x: x coordinate of the direct image
-        :param direct_y: y coordinate of the direct image
-        :param ROI: region of interest. Region used for process
-        :param subarray: size of the subarray
-        :param twoDirect: (default False) whether bi-directional
-        scanning mode applied
-        :param restore: (default False) whether restoring previous calculated result
-        :param restoreDIR: (default None) restoration directory
+        :param configFN: configuration file name. Configuration file
+        contains all the pre-determined configuration information
         :returns: None
-
         """
-        super(scanData, self).__init__()
+        self.configFN = configFN
+        self.conf = configparser.ConfigParser()
+        self.conf.read(configFN)
+        infoFile = self.conf['directory']['infoFile']
         self.info = pd.read_csv(
             infoFile, parse_dates=True, index_col='Datetime')
         self.info.sort_values('Time')
         self.info = self.info[(self.info['Filter'] == 'G141')]
+        projDIR = self.conf['directory']['projDIR']
+        self.dataDIR = self.conf['directory']['dataDIR']
+        self.saveDIR = self.conf['directory']['saveDIR']
+        calibrationDIR = self.conf['directory']['calibrationDIR']
+        skyFN = self.conf['config']['skyFN']
+        skyFN = path.join(calibrationDIR, skyFN)
+        flatFN = self.conf['config']['flatFN']
+        flatFN = path.join(calibrationDIR, flatFN)
         self.skyMask = fits.getdata(skyFN, 0)
         self.flat = fits.getdata(flatFN, 0)
-        self.direct_x = direct_x
-        self.direct_y = direct_y
-        self.ROI = ROI
-        self.XOI = np.arange(ROI[0], ROI[1])  # list of x index within ROI
-        self.subarray = subarray
-        # full wavelength range
+        self.direct_x = self.conf['config'].getfloat('direct_x')
+        self.direct_y = self.conf['config'].getfloat('direct_y')
+        self.ROI = json.loads(self.conf['config']['ROI'])
+        self.XOI = np.arange(self.ROI[0],
+                             self.ROI[1])  # list of x index within ROI
+        self.yDataStart = self.conf['config'].getint('yDataStart')
+        self.yDataEnd = self.conf['config'].getint('yDataEnd')
+        self.subarray = self.conf['config'].getint('subarray')
+        # full wavelength range in micron
         self.wavelength = wfc3Dispersion(
-            direct_x, direct_y, subarray=subarray) / 1e4
+            self.direct_x, self.direct_y, subarray=self.subarray) / 1e4
         self.waveOI = self.wavelength[self.XOI]  # wavelength in ROI
         self.scanFileList = []
-        self.saveDIR = saveDIR
         self.time = self.info['Time'].values
         self.orbit = self.info['Orbit'].values
         self.expTime = self.info['Exp Time'].values[0]
         self.xShift = self.info['DX'].values
+        self.scanDirect = self.info['ScanDirection'].values
+        self.nFrame = len(self.time)
 
         # read in median cubes
+        medianFNs = json.loads(self.conf['config']['medianFNs'])
+        medianFNs = [
+            path.join(calibrationDIR, medianFN) for medianFN in medianFNs
+        ]
+        self.twoDirect = self.conf['config'].getboolean('twoDirect')
         if type(medianFNs) != list:
             medianFNs = [medianFNs]
         with open(medianFNs[0], 'rb') as pkl:
-            self.medianDiff0 = pickle.load(pkl)
-        if twoDirect:
-            with open(medianFNs[1], 'rb') as pkl:
-                self.medianDiff1 = pickle.load(pkl)
-        else:
-            self.medianDiff1 = self.medianDiff0
+            self.medianCube0 = pickle.load(pkl)
+        if self.twoDirect:
+            try:
+                with open(medianFNs[1], 'rb') as pkl:
+                    self.medianCube1 = pickle.load(pkl)
+            except FileNotFoundError:
+                self.medianCube1 = self.medianCube0
         self.twoDirectScale = 1.0
 
         # extracted light curve stores in 2D arrays
@@ -97,14 +95,15 @@ class scanData(object):
         # Second dimension is time
         # Both count rate are stored
         self.LCACQUIRED = False
-        self.countMat = np.zeros((len(xList), len(sd.time)))
-        self.countErrMat = np.zeros((len(xList), len(sd.time)))
-        self.totalCountMat = np.zeros((len(xList), len(sd.time)))
-        self.totalCountErrMat = np.zeros((len(xList), len(sd.time)))
-
+        self.countMat = np.zeros((len(self.XOI), len(self.time)))
+        self.countErrMat = np.zeros((len(self.XOI), len(self.time)))
+        self.totalCountMat = np.zeros((len(self.XOI), len(self.time)))
+        self.totalCountErrMat = np.zeros((len(self.XOI), len(self.time)))
+        restore = self.conf['config'].getboolean('restore')
+        restoreDIR = self.conf['directory']['restoreDIR']
         if restore:
             if restoreDIR is None:
-                restoreDIR = saveDIR
+                restoreDIR = self.saveDIR
             for fn in self.info['File Name']:
                 print("Restoring observation {0}".format(fn))
                 with open(
@@ -120,30 +119,30 @@ class scanData(object):
                     self.scanFileList.append(
                         scanFile(
                             fn,
-                            fileDIR,
-                            saveDIR,
+                            self.dataDIR,
+                            self.saveDIR,
                             self.skyMask,
                             self.flat,
                             medianCube0,
                             self.wavelength,
                             self.xShift[i],
                             self.ROI,
-                            arraySize=subarray))
+                            arraySize=self.subarray))
 
                 if self.scanDirect[i] == 1:
                     medianCube1 = self.medianCube1
                     self.scanFileList.append(
                         scanFile(
                             fn,
-                            fileDIR,
-                            saveDIR,
+                            self.dataDIR,
+                            self.saveDIR,
                             self.skyMask,
                             self.flat,
                             medianCube1,
                             self.wavelength,
                             self.xShift[i],
                             self.ROI,
-                            arraySize=subarray))
+                            arraySize=self.subarray))
 
         # get image cube for calibration
         self.nSamp = self.scanFileList[0].nSamp  # number of samp read
@@ -151,10 +150,10 @@ class scanData(object):
         self.dqCubeList = []  # mask inclucde bad pixel and cosmic rays
         self.crCubeList = []
         for i in range(self.nSamp):
-            sampCube = np.zeros((subarray, subarray, self.nExp))
-            dqCube = np.zeros((subarray, subarray, self.nExp))
-            crCube = np.zeros((subarray, subarray, self.nExp))
-            for j in range(self.nExp):
+            sampCube = np.zeros((self.subarray, self.subarray, self.nFrame))
+            dqCube = np.zeros((self.subarray, self.subarray, self.nFrame))
+            crCube = np.zeros((self.subarray, self.subarray, self.nFrame))
+            for j in range(self.nFrame):
                 sampCube[:, :, j] = self.scanFileList[j].imaDataCube[:, :, i]
                 dqCube[:, :, j] = self.scanFileList[j].dqCube[:, :, i]
                 crCube[:, :, j] = self.scanFileList[j].crCube[:, :, i]
@@ -217,7 +216,7 @@ class scanData(object):
         :rtype: tuple of two numpy arrays
 
         """
-        warn("For more precise light curve, use countLightCurve instead")
+        # warn("For more precise light curve, use countLightCurve instead")
         lc = np.zeros(len(self.scanFileList))
         lc_err = np.zeros(len(self.scanFileList))
         for i, sf in enumerate(self.scanFileList):
@@ -247,6 +246,10 @@ class scanData(object):
         :rtype: tuple of two numpy arrays
 
         """
+        if not self.LCACQUIRED:
+            print('Light curve not collected yet')
+            print('collecting light curve')
+            self.getLightCurve()
 
         lc = np.zeros(len(self.scanFileList))
         lc_err = np.zeros(len(self.scanFileList))
@@ -280,40 +283,87 @@ class scanData(object):
             print("To re-extract the light curve, using overwrite=True option")
             return
 
+        self.LCACQUIRED = True
+        for sf in self.scanFileList:
+            sf.calTotalCountSpec(overwrite=overwrite)
         for i, x in enumerate(self.XOI):
             count, countErr = self.columnLightCurve(x,
-                                                    [self.ROI[2], self.ROI[3]])
-            totalCount, totalCountErr = sd.countLightCurve(x)
+                                                    [self.yDataStart, self.yDataEnd])
+            totalCount, totalCountErr = self.countLightCurve(x)
             # use the mean of the ratio to determine the scale
             scale = np.mean(totalCount / count)
             self.totalCountMat[i, :] = totalCount
             self.totalCountErrMat[i, :] = totalCountErr
-            self.countMat[j, :] = totalCount / scale
-            self.countErrMat[j, :] = totalCountErr / scale
+            self.countMat[i, :] = totalCount / scale
+            self.countErrMat[i, :] = totalCountErr / scale
 
-    def whiteLC(self, plot=False):
-        """get broadband light curve
+    def getWhiteLightCurve(self, plot=False):
+        """get broadband light curve and the uncertainties
 
         :param plot: whether to make a plot
         :returns: broad band light curve and uncertainties
         :rtype: tuple of two numpy arrays
 
         """
-
-        wlc = np.zeros(len(self.scanFileList))
-        wlc_err = np.zeros(len(self.scanFileList))
-        for i, sf in enumerate(self.scanFileList):
-            count, error = sf.white()
-            wlc[i] = count
-            wlc_err[i] = error
+        if not self.LCACQUIRED:
+            self.getLightCurve()
+        self.whiteLightCurve = self.countMat.sum(axis=0)
+        self.whiteLightCurveErr = np.sqrt((self.countErrMat**2).sum(axis=0))
         if plot:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-            ax.errorbar(self.time, wlc, yerr=wlc_err, fmt='.', ls='', ms=6)
+            ax.errorbar(
+                self.time,
+                self.whiteLightCurve,
+                yerr=self.whiteLightCurveErr,
+                fmt='.',
+                ls='',
+                ms=6)
             ax.set_xlabel('Time [s]')
-            ax.set_ylabel('Counts')
+            ax.set_ylabel('Total Counts')
             ax.set_title('White Light Curve')
-        return wlc, wlc_err
+        return self.whiteLightCurve, self.whiteLightCurveErr
+
+    def removeRamp(self, initFN):
+        """use RECTE model to remove the ramp effect
+
+        :param initFN: file that saves the initial values and for the ramp fit
+        :param excludedOrbit: orbits that are not going to use in the fit
+        :param binSize: bin size used for ramp correction
+        :returns: ramp removed light curve and error
+        :rtype: tuple of two numpy array
+
+        """
+        from lmfit import Parameters
+        # get ramp paraeters form config files
+        recteConf = configparser.ConfigParser()
+        recteConf.read(initFN)
+        plot = recteConf['general'].getboolean('plot')
+        plotDIR = recteConf['general']['plotDIR']
+        p = Parameters()
+        for pName in ['trap_pop_s', 'trap_pop_f', 'dTrap_s', 'dTrap_f']:
+            p.add(
+                pName,
+                value=recteConf[pName].getfloat('value'),
+                min=recteConf[pName].getfloat('min'),
+                max=recteConf[pName].getfloat('max'),
+                vary=recteConf[pName].getboolean('vary'))
+
+        excludedOrbit = json.loads(recteConf['general']['excludedOrbit'])
+        binSize = recteConf['general'].getint('binSize')
+        weights = np.ones_like(self.time)
+        if excludedOrbit is not None:
+            if type(excludedOrbit) is not list:
+                excludedOrbit = [excludedOrbit]
+            for o in excludedOrbit:
+                weights[self.orbit == o] = 0
+        self.LCMat_deRamp = self.countMat.copy()
+        self.LCErrMat_deRamp = self.countErrMat.copy()
+        self.rampModelMat = np.zeros_like(self.countMat)
+        self.LCMat_deRamp, self.LCErrMat_deRamp, self.rampModelMat = scanDeRamp(
+            p, weights, self.expTime, self.countMat, self.countErrMat,
+            self.time, self.XOI, self.twoDirect, self.scanDirect, binSize, plot, plotDIR)
+        return self.LCMat_deRamp, self.LCErrMat_deRamp
 
     def skyTrend(self, plot=False):
         """calculate the sky background levels for each differenced frames
@@ -343,6 +393,7 @@ class scanData(object):
 
     def plotScanRate(self):
         """plot the profiles along the scanning direction
+        The scan rate plot serves as a diagnostic of the data reduction quality
 
         :returns: plotted figure
         :rtype: matplotlib.figure
@@ -398,88 +449,4 @@ class scanData(object):
 
 
 if __name__ == '__main__':
-    visit = 1
-    xStart = 70
-    xEnd = 200
-    yStart = 135
-    yEnd = 220
-    yDataStart = 164
-    yDataEnd = 184
-    rootDIR = path.expanduser('~/Documents/TRAPPIST-1')
-    analysisDIR = path.join(rootDIR, 'Analysis')
-    dataDIR = path.join(rootDIR, 'Data')
-    infoFN = path.join(analysisDIR,
-                       'TRAPPIST_visit_{0}_shiftInfo.csv'.format(visit))
-    saveDIR = path.join(rootDIR, 'pickle/visit_{0}'.format(visit))
-    skyFN = path.expanduser('~/Documents/TRAPPIST-1/analysis/skymask.fits')
-    flatFN = path.expanduser('~/Documents/TRAPPIST-1/analysis/flatfield.fits')
-    sd = scanData(
-        infoFN,
-        dataDIR,
-        saveDIR,
-        skyFN,
-        flatFN, [xStart, xEnd, yStart, yEnd],
-        twoDirect=True,
-        restore=False,
-        restoreDIR=saveDIR)
-    sd.save()
-    # collect light curves
-    xList = list(range(xStart, xEnd))
-    LCmatrix = np.zeros((len(xList), len(sd.time)))
-    Errmatrix = np.zeros((len(xList), len(sd.time)))
-    LCmatrix0 = np.zeros((len(xList), len(sd.time)))
-    Errmatrix0 = np.zeros((len(xList), len(sd.time)))
-    twoDirectScale = sd.calcTwoDirectScale()
-    upIndex = np.where(sd.scanDirect == 0)[0]
-    downIndex = np.where(sd.scanDirect == 1)[0]
-    plt.close('all')
-    wlc, wlc_err = sd.whiteLC(plot=True)
-    fig = plt.gcf()
-    fig.savefig(
-        path.join(rootDIR, 'whitelc',
-                  'whitelc_visit_{0:02d}.pdf').format(visit))
-    for j, x in enumerate(xList):
-        lc, lc_err = sd.columnLightCurve(x, [yDataStart, yDataEnd])
-        lc0, lc_err0 = sd.countLightCurve(x)
-        # scaleUp = lc0[upIndex].mean() / lc[upIndex].mean()
-        # scaleDown = lc0[downIndex].mean() / lc[downIndex].mean()
-        scale = lc0.mean() / lc.mean()
-        scaleUp = scale
-        scaleDown = scaleUp / twoDirectScale
-        lc[upIndex] = lc0[upIndex] / scaleUp
-        lc[downIndex] = lc0[downIndex] / scaleDown
-        lc_err[upIndex] = lc_err0[upIndex] / scaleUp
-        lc_err[downIndex] = lc_err0[downIndex] / scaleDown
-        # lc[downIndex] = lc[downIndex] / twoDirectScale
-        # scale = lc0.mean() / lc.mean()
-        # lc = lc0 / scale
-        # lc_err = lc_err0 / scale
-        LCmatrix[j, :] = lc
-        Errmatrix[j, :] = lc_err
-        LCmatrix0[j, :] = lc * scale
-        Errmatrix0[j, :] = lc_err * scale
-    fig1, ax1 = plt.subplots()
-    wlc = LCmatrix0.sum(axis=0)
-    elc = np.sqrt((Errmatrix0**2).sum(axis=0))
-    ax1.errorbar(sd.time, wlc, yerr=elc, ls='', fmt='.')
-    ax1.set_xlabel('Time [s]')
-    ax1.set_ylabel('Flux')
-    np.savetxt('whitelc.dat', np.array([sd.time, wlc, elc]).T)
-    fig1.savefig(
-        path.join(rootDIR, 'whitelc',
-                  'whitelc0_visit_{0:02d}.pdf'.format(visit)))
-    db = shelve.open(
-        path.join(saveDIR, 'LCmatrix_visit_{0:02d}.shelve'.format(visit)))
-    db['LCmatrix'] = LCmatrix
-    db['Errmatrix'] = Errmatrix
-    db['time'] = sd.time
-    db['xList'] = xList
-    db['orbit'] = sd.orbit
-    db['expTime'] = sd.expTime
-    db.close()
-    db = shelve.open(
-        path.join(saveDIR, 'LCmatrix_visit_{0:02d}_sky.shelve'.format(visit)))
-    t, sky = sd.skyTrend()
-    db['time'] = t
-    db['sky'] = sky
-    db.close()
+    pass

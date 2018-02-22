@@ -212,6 +212,16 @@ class scanFile:
             self.imaDataDiff[:, :, i] =\
                                         (self.imaDataFixedCube.data[:, :, i+1] -
                                          self.imaDataFixedCube.data[:, :, i])
+            mask = self.dqCube[:, :, i] + self.crCube[:, :, i]
+            goody, goodx = np.where(mask == 0)
+            bady, badx = np.where(mask > 0)
+            fixedIm = self.imaDataDiff[:, :, i].copy()
+            interpv = griddata(
+                (goody, goodx),
+                self.imaDataDiff[goody, goodx, i], (bady, badx),
+                method='linear')
+            fixedIm[bady, badx] = interpv
+            self.imaDataDiff[:, :, i] = fixedIm
 
             # FIXME: Nov 15: parameter errDiff is not used, why bother?
             self.errDiff[:, :, i] = self.errCube[:, :, i + 1]**2
@@ -329,7 +339,7 @@ class scanFile:
 
         """
         if self.COUNTCALCULATED and (not overwrite):
-            print("cal total count is done.")
+            print("total count is calculated.")
             print(
                 "Use option 'overwrite=True' to redo and overwrite the result")
             return self.totalCountSpec, self.totalCountSpecErr
