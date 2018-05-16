@@ -159,6 +159,14 @@ def ackBarCorrector2(t, weights, counts, p, expTime, scanDirect, MCMC=False):
     # model fit, obtain crate, and transit parameter,
     # but ignore transit para for this time
     t0 = t - t[0]  # make the first element in time array 0
+    # fitResult = rampModel2.fit(
+    #     counts,
+    #     tExp=t0,
+    #     expTime=expTime,
+    #     scanDirect=scanDirect,
+    #     weights=weights,
+    #     params=p,
+    #     method='nelder')
     fitResult = rampModel2.fit(
         counts,
         tExp=t0,
@@ -166,14 +174,6 @@ def ackBarCorrector2(t, weights, counts, p, expTime, scanDirect, MCMC=False):
         scanDirect=scanDirect,
         weights=weights,
         params=p,
-        method='nelder')
-    fitResult = rampModel2.fit(
-        counts,
-        tExp=t0,
-        expTime=expTime,
-        scanDirect=scanDirect,
-        weights=weights,
-        params=fitResult.params,
         method='powell')
     if MCMC:
         # TODO: add support for mcmc fit
@@ -200,60 +200,6 @@ def ackBarCorrector2(t, weights, counts, p, expTime, scanDirect, MCMC=False):
     return ramp, crates, slope
 
 
-def visit_deRamp(pDeRamp,
-                 time,
-                 LCmatrix,
-                 Errmatrix,
-                 weights,
-                 expTime,
-                 twoDirect=False,
-                 scanDirect=None,
-                 plot=False,
-                 plotDIR='.',
-                 MCMC=False):
-    """
-    fit transit models
-    deAckbar for a visit
-    """
-    nLC = LCmatrix.shape[0]  # number of light curves
-    rampMat = LCmatrix.copy()
-    slopeMat = LCmatrix.copy()
-    p = pDeRamp.copy()
-    print("Ramp fitting start. {0} channels to be corrected".format(nLC))
-    if plot and (not path.exists(plotDIR)):
-        os.makedirs(plotDIR)
-    for i in range(nLC):
-        print("fitting ramps for channel {0:02d}/{1}".format(i, nLC))
-        if twoDirect:
-            ramp, crates, slope = ackBarCorrector2(
-                time, weights, LCmatrix[i, :], p, expTime, scanDirect, MCMC)
-        else:
-            ramp, crates, slope = ackBarCorrector1(
-                time, weights, LCmatrix[i, :], p, expTime, MCMC)
-        rampMat[i, :] = ramp
-        slopeMat[i, :] = slope
-        if plot:
-            plt.close('all')
-            print("making ramp fit plot for channel {0:02d}/{1}".format(i, nLC))
-            fig, ax = plt.subplots()
-            ax.errorbar(time / 3600, LCmatrix[i, :], yerr=Errmatrix[i, :], ls='none')
-            ax.plot(time / 3600, ramp * crates)
-            ax.set_xlabel('Time [hour]')
-            ax.set_ylabel('Count [e$^-$]')
-            ax.set_title('RECTE Ramp Fit for Channel {0:02d}/{1}'.format(i, nLC))
-            saveFN = path.join(plotDIR, 'Ramp_fit_Cannel_{0:02d}.pdf'.format(i))
-            plt.savefig(saveFN)
-            fig, ax = plt.subplots()
-            ax.errorbar(time / 3600, LCmatrix[i, :] / (ramp * crates),
-                        yerr=Errmatrix[i, :] / (ramp * crates), ls='none')
-            ax.set_xlabel('Time [hour]')
-            ax.set_ylabel('Relative flux')
-            ax.set_title('RECTE Ramp Removed for Channel {0:02d}/{1}'.format(i, nLC))
-            saveFN = path.join(plotDIR, 'Ramp_removed_Cannel_{0:02d}.pdf'.format(i))
-            plt.savefig(saveFN)
-    return rampMat, slopeMat
-
-
 def scanDeRamp(p0,
                weights,
                expTime,
@@ -267,9 +213,33 @@ def scanDeRamp(p0,
                plot=False,
                plotDIR='.',
                MCMC=False):
+    """perform ramp effect correction using RECTE model
+
+    :param p0: initial states of the model parameters
+    :param weights: fitting weights for each point on the light curve
+    :param expTime: exposure time of the observations
+    :param LCmatrix: 2 dimensional array that saves all the relevant light curves
+    :param Errmatrix: 2 dimensional array that saves all the uncertainties.
+    :param time: time stamp for each observations.
+    :param xList: the x index for each column that we used in light curve extraction
+    :param twoDirect: boolean, wheter two dimensional scan is adopted
+    :param scanDirect: one array tgat list s teh sssac bb
+    :param binSize: size in wavelegnth for each bin
+    :param plot: wheter to do a plot
+    :param plotDIR: diret
+    :param MCMC: boolean wheter to perform MCMC to constrain the parameters
+    :returns: corrected lighg  curves
+    :rtype:
+
+    """
+
     # properly bin the
     xBinLEdge = np.arange(xList.min(), xList.max(), binSize)  # left edge of each bin
     xBinIndex = np.digitize(xList, xBinLEdge) - 1
+
+    # calculate the ramp correction in binned light curves
+    # Justifications: single column light curves significantly suffer from
+    # jitters, binning can reduce such systematics
     mat_binned = np.array([
         rebin(LCmatrix[:, j], binSize, method='mean')
         for j in range(len(time))
@@ -278,16 +248,61 @@ def scanDeRamp(p0,
         rebin(Errmatrix[:, j], binSize, method='meansq') / np.sqrt(binSize)
         for j in range(len(time))
     ]).T
-    rampMat, slopeMat = visit_deRamp(
-        p0, time, mat_binned, err_binned, weights, expTime, twoDirect,
-        scanDirect, plot, plotDIR, MCMC)
+
+    nLC = mat_binned.shape[0]  # number of light curves
+    rampMat = mat_binned.copy()
+    slopeMat = mat_binned.copy()
+    crateMat = mat_binned.copy()
+    p = p0.copy()
+    print("Ramp fitting start. {0} channels to be corrected".format(nLC))
+    if plot and (not path.exists(plotDIR)):
+        os.makedirs(plotDIR)
+    for i in range(nLC):
+        print("fitting ramps for channel {0:02d}/{1}".format(i, nLC))
+        if twoDirect:
+            ramp, crates, slope = ackBarCorrector2(
+                time, weights, mat_binned[i, :], p, expTime, scanDirect, MCMC)
+        else:
+            ramp, crates, slope = ackBarCorrector1(
+                time, weights, mat_binned[i, :], p, expTime, MCMC)
+        rampMat[i, :] = ramp
+        slopeMat[i, :] = slope
+        crateMat[i, :] = crates
+        if plot:
+            plt.close('all')
+            print("making ramp fit plot for ramp correction channel {0:02d}/{1}".format(i, nLC))
+            fig, ax = plt.subplots()
+            ax.errorbar(time / 3600, mat_binned[i, :], yerr=err_binned[i, :], ls='none')
+            ax.plot(time / 3600, ramp * crates)
+            ax.set_xlabel('Time [hour]')
+            ax.set_ylabel('Count [e$^-$]')
+            ax.set_title('RECTE Correction Channel {0:02d}/{1}'.format(i, nLC))
+            saveFN = path.join(plotDIR, 'Ramp_fit_Channel_{0:02d}.pdf'.format(i))
+            plt.savefig(saveFN)
+            fig, ax = plt.subplots()
+            ax.errorbar(time / 3600, mat_binned[i, :] / (ramp * crates),
+                        yerr=err_binned[i, :] / (ramp * crates), ls='none')
+            ax.set_xlabel('Time [hour]')
+            ax.set_ylabel('Relative flux')
+            ax.set_title('RECTE Ramp Removed for Channel {0:02d}/{1}'.format(i, nLC))
+            saveFN = path.join(plotDIR, 'Ramp_removed_Channel_{0:02d}.pdf'.format(i))
+            plt.savefig(saveFN)
     LCmatrix_deramp = LCmatrix.copy()
     Errmatrix_deramp = Errmatrix.copy()
     correctionMatrix = Errmatrix.copy()
+    # normalize the light curve from two scanning directions
+    upIndex, = np.where(scanDirect == 0)
+    downIndex, = np.where(scanDirect == 1)
     for i in range(len(xList)):
         ramp_i = rampMat[xBinIndex[i], :]
-        slope_i = rampMat[xBinIndex[i], :]
+        slope_i = slopeMat[xBinIndex[i], :]
         LCmatrix_deramp[i, :] = LCmatrix[i, :] / ramp_i / slope_i
+        crate_up = np.median(LCmatrix_deramp[i, upIndex])
+        crate_down = np.median(LCmatrix_deramp[i, downIndex])
+        LCmatrix_deramp[i, upIndex] = LCmatrix_deramp[i, upIndex] / crate_up
+        LCmatrix_deramp[i, downIndex] = LCmatrix_deramp[i, downIndex] / crate_down
+        Errmatrix_deramp[i, upIndex] = Errmatrix_deramp[i, upIndex] / crate_up
+        Errmatrix_deramp[i, downIndex] = Errmatrix_deramp[i, downIndex] / crate_down
         correctionMatrix[i, :] = ramp_i * slope_i
     return LCmatrix_deramp, Errmatrix_deramp, correctionMatrix
 

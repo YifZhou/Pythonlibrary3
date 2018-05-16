@@ -3,11 +3,11 @@ import pickle
 from os import path
 import numpy as np
 
-""" get field dependent G141 master sky
-original sky cube from WFC3 ISR 2015-17
+""" get field dependent G141 master sky original sky cube from WFC3
+ISR 2015-17
 
-in WFC3 ISR 2015-17, the sky cube is flat flieded,
-the function here returns the sky cube with flat field multiplied for sky subtraction
+in WFC3 ISR 2015-17, the sky cube is flat flieded, the function here
+returns the sky cube with flat field multiplied for sky subtraction
 """
 
 scriptDIR = path.dirname(path.realpath(__file__))

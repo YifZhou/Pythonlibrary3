@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import os
-from os import path
+from os import path, makedirs
 from warnings import warn
 import configparser
 import json
@@ -95,6 +95,7 @@ class scanData:
         # Second dimension is time
         # Both count rate are stored
         self.LCACQUIRED = False
+        self.RAMPREMOVED = False
         self.countMat = np.zeros((len(self.XOI), len(self.time)))
         self.countErrMat = np.zeros((len(self.XOI), len(self.time)))
         self.totalCountMat = np.zeros((len(self.XOI), len(self.time)))
@@ -280,7 +281,7 @@ class scanData:
         """
         if self.LCACQUIRED and (not overwrite):
             print("Light curve acquired already")
-            print("To re-extract the light curve, using overwrite=True option")
+            print("To re-extract the light curve, use overwrite=True option")
             return
 
         self.LCACQUIRED = True
@@ -324,22 +325,22 @@ class scanData:
             ax.set_title('White Light Curve')
         return self.whiteLightCurve, self.whiteLightCurveErr
 
-    def removeRamp(self, initFN):
+    def removeRamp(self, initFN, overwrite=False):
         """use RECTE model to remove the ramp effect
 
         :param initFN: file that saves the initial values and for the ramp fit
-        :param excludedOrbit: orbits that are not going to use in the fit
-        :param binSize: bin size used for ramp correction
-        :returns: ramp removed light curve and error
-        :rtype: tuple of two numpy array
-
         """
+        if self.RAMPREMOVED and (not overwrite):
+            print("Ramp removal DONE!")
+            print("To redo ramp removal, use overwrite=True option")
         from lmfit import Parameters
         # get ramp paraeters form config files
         recteConf = configparser.ConfigParser()
         recteConf.read(initFN)
         plot = recteConf['general'].getboolean('plot')
         plotDIR = recteConf['general']['plotDIR']
+        if plot and (not path.exists(plotDIR)):
+            makedirs(plotDIR)
         p = Parameters()
         for pName in ['trap_pop_s', 'trap_pop_f', 'dTrap_s', 'dTrap_f']:
             p.add(
@@ -362,7 +363,11 @@ class scanData:
         self.rampModelMat = np.zeros_like(self.countMat)
         self.LCMat_deRamp, self.LCErrMat_deRamp, self.rampModelMat = scanDeRamp(
             p, weights, self.expTime, self.countMat, self.countErrMat,
-            self.time, self.XOI, self.twoDirect, self.scanDirect, binSize, plot, plotDIR)
+            self.time, self.XOI, self.twoDirect, self.scanDirect, binSize,
+            plot, plotDIR)
+        self.whiteLightCurve_deRamp = self.LCMat_deRamp.sum(axis=0)
+        self.whiteLightCurveErr_deRamp = np.sqrt((self.LCErrMat_deRamp**2).sum(axis=0))
+        self.RAMPREMOVED = True
         return self.LCMat_deRamp, self.LCErrMat_deRamp
 
     def skyTrend(self, plot=False):
