@@ -6,8 +6,8 @@ __all__ = [
     'initiateProject'
 ]
 
-# from .HSTtiming import HSTtiming
-# from .HSTsinLC import HSTsinLC
-# from .HSTtransitLC import HSTtransitLC
+from HST.HSTtiming import HSTtiming
+from HST.HSTsinLC import HSTsinLC
+from HST.HSTtransitLC import HSTtransitLC
 from .timeSeriesInfo import timeSeriesInfo
 from .initiateProject import initiateProject

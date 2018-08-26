@@ -4,3 +4,4 @@ from .linearFit import linearFit
 from .gaussFit import gaussFit
 from .BFFitTester import BFFitTester
 from .sinFit import sinFit
+from .linearScale import linearScale

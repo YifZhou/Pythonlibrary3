@@ -21,7 +21,7 @@ def sinFit(t, y, dy=None, p0=None):
     if p0 is None:
         p0 = mod.make_params()
     if dy is not None:
-        weights = 1 / (dy * dy)
+        weights = 1 / (dy)
     else:
         weights = None
     bestfit = mod.fit(y, t=t, params=p0, weights=weights)

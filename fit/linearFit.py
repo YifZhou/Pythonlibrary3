@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 from lmfit.models import LinearModel
+import numpy as np
 
 
 def linearFit(x, y, dy=None, p0=None):
@@ -18,7 +19,7 @@ def linearFit(x, y, dy=None, p0=None):
         pars['intercept'].value = p0[0]
         pars['slope'].value = p0[1]
     if dy is not None:
-        weights = 1 / (dy * dy)
+        weights = 1 / np.abs(dy)
     else:
         weights = None
     bestfit = mod.fit(y, x=x, params=pars, weights=weights)

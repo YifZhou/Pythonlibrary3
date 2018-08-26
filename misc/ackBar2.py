@@ -67,6 +67,8 @@ def ackBar2(
     obsCounts = np.zeros(len(tExp))
     trap_pop_s = min(trap_pop_s, nTrap_s)
     trap_pop_f = min(trap_pop_f, nTrap_f)
+    dEsList = np.zeros(len(tExp))
+    dEfList = np.zeros(len(tExp))
     for i in range(len(tExp)):
         try:
             dt = tExp[i+1] - tExp[i]
@@ -89,6 +91,8 @@ def ackBar2(
                 # scanning mode, no incoming flux between exposures
                 dE2_s = - trap_pop_s * (1 - np.exp(-(dt - exptime)/tau_trap_s))
                 dE2_f = - trap_pop_f * (1 - np.exp(-(dt - exptime)/tau_trap_f))
+                dEsList[i] = dE1_s + dE2_s
+                dEfList[i] = dE1_f + dE2_f
             elif mode == 'staring':
                 # for staring mode, there is flux between exposures
                 dE2_s = (eta_trap_s * f_i / c1_s - trap_pop_s) * (1 - np.exp(-c1_s * (dt - exptime)))
@@ -100,10 +104,8 @@ def ackBar2(
             trap_pop_s = min(trap_pop_s + dE2_s, nTrap_s)
             trap_pop_f = min(trap_pop_f + dE2_f, nTrap_f)
         elif dt < 1200:
-            # considering in orbit download scenario
-            if mode == 'staring':
-                trap_pop_s = min(trap_pop_s * np.exp(-(dt-exptime)/tau_trap_s), nTrap_s)
-                trap_pop_f = min(trap_pop_f * np.exp(-(dt-exptime)/tau_trap_f), nTrap_f)
+            trap_pop_s = min(trap_pop_s * np.exp(-(dt-exptime)/tau_trap_s), nTrap_s)
+            trap_pop_f = min(trap_pop_f * np.exp(-(dt-exptime)/tau_trap_f), nTrap_f)
         else:
             # switch orbit
             dt0_i = next(dt0)
@@ -128,7 +130,7 @@ if __name__ == '__main__':
     t1 = np.linspace(0, 2700, 80)
     t2 = np.linspace(5558, 8280, 80)
     t = np.concatenate((t1, t2))
-    crate = 100
+    crate = 2000
     crates = crate * np.ones(len(t))
     dataDIR = '/Users/ZhouYf/Documents/HST14241/alldata/2M0335/DATA/'
     from os import path
@@ -144,12 +146,13 @@ if __name__ == '__main__':
     tExp = grismInfo['Time'].values
     # cRates = np.ones(len(LC)) * LC.mean() * 1.002
     cRates = np.ones(len(tExp)) * 100
-    obs = ackBar2(500, 0.01, 5000,
-                  500, 0.005, 20,
-                  tExp, cRates, exptime=expTime, lost=0,
+    obs, es, ef = ackBar2(cRates*2, tExp, exptime=expTime/2, lost=1,
+                  mode='scanning')
+    obs2, es2, ef2 = ackBar2(cRates*100, tExp, exptime=expTime/100, lost=1,
                   mode='scanning')
     plt.close('all')
     # plt.plot(tExp, LC*expTime, 'o')
-    plt.plot(tExp, obs, '-')
+    plt.plot(tExp, obs, marker='o')
+    plt.plot(tExp, obs2, marker='s')
     # plt.ylim([crate * 0.95, crate * 1.02])
     plt.show()

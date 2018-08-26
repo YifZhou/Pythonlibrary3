@@ -10,7 +10,7 @@ return the electron count for each exposure
 import matplotlib.pyplot as plt
 import batman
 import numpy as np
-from .HSTtiming import HSTtiming
+from HST.timeSeries.HSTtiming import HSTTiming
 
 
 def HSTtransitLC(expTime, cRate,
@@ -45,7 +45,7 @@ def HSTtransitLC(expTime, cRate,
     params.limb_dark = "linear"  # limb darkening model
     params.u = [0.28]  # limb darkening coefficients
 
-    t = HSTtiming(expTime, orbits, orbitLength, visibility, overhead)
+    t = HSTTiming(expTime, orbits, orbitLength, visibility, overhead)
     m = batman.TransitModel(params, t / (24 * 3600))
     # calculate count, be careful that period in h
     count = cRate * expTime * m.light_curve(params)

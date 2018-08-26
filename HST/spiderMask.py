@@ -19,9 +19,21 @@ qMask -- indicante if all 4 spiders are masked"""
     y1 = b1 * (x - x0) + y0  # y for SWNE spider
     y2 = b2 * (x - x0) + y0  # y for SENW spider
     x = np.around(x).astype(int)
-    mask[np.around(y1).astype(int), x] = 1
-    mask[np.around(y2).astype(int), x] = 1
+    y1 = np.around(y1).astype(int)
+    y2 = np.around(y2).astype(int)
+    index1 = np.where((y1 > 0) & (y1 < shape[0]) &
+                      (x > 0) & (x < shape[0]))[0]
+    index2 = np.where((y2 > 0) & (y2 < shape[0]) &
+                      (x > 0) & (x < shape[0]))[0]
+    mask[y1[index1], x[index1]] = 1
+    mask[y2[index2], x[index2]] = 1
     for w in np.arange(-width, width):
-        mask[np.around(y1 + w).astype(int), x] = 1
-        mask[np.around(y2 + w).astype(int), x] = 1
+        y1w = np.around(y1 + w).astype(int)
+        y2w = np.around(y2 + w).astype(int)
+        index1 = np.where((y1w > 0) & (y1w < shape[0]) &
+                          (x > 0) & (x < shape[0]))[0]
+        index2 = np.where((y2w > 0) & (y2w < shape[0]) &
+                          (x > 0) & (x < shape[0]))[0]
+        mask[y1w[index1], x[index1]] = 1
+        mask[y2w[index2], x[index2]] = 1
     return mask.astype(bool)
