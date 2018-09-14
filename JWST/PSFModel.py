@@ -5,7 +5,7 @@
 import webbpsf
 
 
-def calc_psf(filterName, oversample=4, offset_r=0, offset_theta=0, instrument='nircam'):
+def calc_psf(filterName, oversample=4, offset_r=0, offset_theta=0, instrument='nircam', fov=5):
     """a convenieint function for using webbpsf to create JWST PSFs
 
     :param filterName: Name fo the filter
@@ -22,6 +22,6 @@ def calc_psf(filterName, oversample=4, offset_r=0, offset_theta=0, instrument='n
     instr.filter = filterName
     instr.options['source_offset_r'] = offset_r
     instr.options['source_offset_theta'] = offset_theta
-    PSF = instr.calc_psf(oversample=oversample)
+    PSF = instr.calc_psf(oversample=oversample, fov_arcsec=fov)
     # retern the oversampled data
     return PSF[0].data
