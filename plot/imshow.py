@@ -16,6 +16,7 @@ def imshow(im,
            cmap='viridis',
            interpolation='nearest',
            plotColorbar=True,
+           cbarLabel="",
            percentile=0.995):
     """my own imshow function
 
@@ -55,7 +56,8 @@ def imshow(im,
                      cmap=cmap,
                      interpolation=interpolation)
     if plotColorbar:
-        ax.figure.colorbar(cax, spacing='uniform')
+        cbar = ax.figure.colorbar(cax, spacing='uniform')
+        cbar.ax.set_ylabel(cbarLabel)
     return cax
 
 

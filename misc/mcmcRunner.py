@@ -2,7 +2,8 @@
 import sys
 import numpy as np
 
-def mcmcRunner(sampler, pos0, nSteps, nBurnin, width=50):
+
+def mcmcRunner(sampler, pos0, nSteps, nBurnin, width=50, showProgress=False):
     """run emcee
 
     :param sampler: emcee sampler
@@ -25,10 +26,11 @@ def mcmcRunner(sampler, pos0, nSteps, nBurnin, width=50):
     sampler.reset()
     print('Running MCMC production')
     for k, result in enumerate(sampler.sample(p0, iterations=nSteps)):
-        n = int((width + 1) * float(k) / nSteps)
-        sys.stdout.write("\r[{0}{1}] {2}/{3}".format('#' * n, ' ' * (
-            width - n), k, nSteps))
-        sys.stdout.write("\n")
+        if showProgress:
+            n = int((width + 1) * float(k) / nSteps)
+            sys.stdout.write("\r[{0}{1}] {2}/{3}".format('#' * n, ' ' * (
+                width - n), k, nSteps))
+            sys.stdout.write("\n")
 
     # calculate the posterior distributions
     nDim = sampler.chain.shape[-1]

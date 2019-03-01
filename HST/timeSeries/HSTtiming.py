@@ -2,7 +2,7 @@
 import numpy as np
 
 
-def HSTTiming(exptime,
+def HSTtiming(exptime,
          orbits=4,
          orbitLength=96,  # min
          visibility=50,  # min

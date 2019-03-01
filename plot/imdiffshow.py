@@ -19,6 +19,7 @@ def imdiffshow(im,
                cmap='coolwarm',
                interpolation='nearest',
                plotColorbar=True,
+               cbarLabel="",
                percentile=0.995):
     """priorily using asinh to strech the image
     """
@@ -38,7 +39,8 @@ def imdiffshow(im,
                      cmap=cmap,
                      interpolation=interpolation)
     if plotColorbar:
-        ax.figure.colorbar(cax, spacing='uniform')
+        cbar = ax.figure.colorbar(cax, spacing='uniform')
+        cbar.ax.set_ylabel(cbarLabel)
     return cax
 
 
